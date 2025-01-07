@@ -1,6 +1,6 @@
 version: "3.7"
 services:
-  database:
+  mongo:
     image: mongo:latest 
     restart: always
     ports:
@@ -11,14 +11,53 @@ services:
       - MONGO_INITDB_DATABASE=example
       - MONGO_INITDB_USERNAME=admin
       - MONGO_INITDB_PASSWORD=111111
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - mern-app
     
-  mongo-express:
-    image: mongo-express
-    restart: always
-    ports:
-      - 8081:8081
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: root
-      ME_CONFIG_MONGODB_ADMINPASSWORD: example
-      ME_CONFIG_MONGODB_URL: mongodb://root:example@mongo:27017/
-      ME_CONFIG_BASICAUTH: false
+      - NODE_ENV=development
+      - PORT=8000
+      - APP_ORIGIN=http://localhost:5173
+      - MONGO_URI=mongodb://root:example@mongo:27017/
+      - JWT_SECRET=myjwtsecret
+      - JWT_REFRESH_SECRET=myjwtrefreshsecret
+      - EMAIL_SENDER=your_email_sender
+      - RESEND_API_KEY=you_resend_api_key
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - mern-app
+    depends_on:
+      - mongo
+  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - mern-app
+    command: npm run dev -- --host
+    depends_on:
+      - api
+
+volumes:
+  mongo_data:
+  caddy_data:
+  caddy_config:
+networks:
+  mern-app:
+    driver: bridge
